@@ -1,0 +1,2 @@
+# Public PlatformIO/ESPHome library git URLs (not PII)
+(?i)^https?://github\.com/(collin80|vekexasia)/[A-Za-z0-9._-]+(\.git)?(#[0-9a-f]+)?$

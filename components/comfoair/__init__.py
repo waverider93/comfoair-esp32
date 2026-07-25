@@ -186,9 +186,8 @@ CONFIG_SCHEMA = cv.All(
 
 async def to_code(config):
     cg.add_library("can_common", None, "https://github.com/collin80/can_common.git#8585f9dc807ebbeedeb509d74159f40f538d2d65")
-    # Use latest esp32_can master branch (6d835ae from 28 Mar 2025)
-    # This is the newest available version but may still have ESP-IDF 5+ compatibility issues
-    cg.add_library("esp32_can", None, "https://github.com/collin80/esp32_can.git#6d835ae82d46748e8267b350680c851a46b38eea")
+    # collin80/esp32_can@6d835ae + drop unused deprecated ADC includes (issue #97)
+    cg.add_library("esp32_can", None, "https://github.com/vekexasia/esp32_can.git#13b42b4f4b7ad14939165270080303675ad9fb1e")
 
 
     var = cg.new_Pvariable(config[CONF_ID])
