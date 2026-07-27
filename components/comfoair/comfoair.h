@@ -1,4 +1,5 @@
 #pragma once
+#include <inttypes.h>
 #include <esp32_can.h>
 
 #include "esphome/components/api/custom_api_device.h"
@@ -123,6 +124,7 @@ class Comfoair: public Component, public climate::Climate, public esphome::api::
 
              message.id = addr.canID();
              memcpy(& message.data.uint8[1], &buf[i * 7], message.length - 1);
+             this->log_can_frame_("TX", message);
              CAN0.sendFrame(message);
          }
          // Send last packet
@@ -130,6 +132,7 @@ class Comfoair: public Component, public climate::Climate, public esphome::api::
          message.data.uint8[0] = dataGrams | 0x80;
          message.length = length - dataGrams * 7 + 1;
          memcpy(& message.data.uint8[1], &buf[dataGrams * 7], length - dataGrams * 7);
+         this->log_can_frame_("TX", message);
          CAN0.sendFrame(message);
 
      } else {
@@ -137,9 +140,53 @@ class Comfoair: public Component, public climate::Climate, public esphome::api::
          message.id = addr.canID();
          message.length = length;
          memcpy(message.data.uint8, buf, length);
+         this->log_can_frame_("TX", message);
          CAN0.sendFrame(message);
 
      }
+  }
+
+  /**
+   * Enable CAN trace mode: logs RX and TX frames via ESP_LOGI.
+   * Automatically disables itself after 10 minutes.
+   */
+  void enable_can_trace() {
+    can_trace_enabled_ = true;
+    can_trace_frame_count_ = 0;
+
+    ESP_LOGI(TAG, "CAN trace enabled");
+
+    // Automatisch nach 10 Minuten deaktivieren.
+    this->set_timeout("can_trace_auto_disable", 10 * 60 * 1000, [this]() {
+      this->disable_can_trace();
+    });
+  }
+
+  void disable_can_trace() {
+    this->cancel_timeout("can_trace_auto_disable");
+
+    if (can_trace_enabled_) {
+      ESP_LOGI(
+        TAG,
+        "CAN trace disabled after %" PRIu32 " frames",
+        can_trace_frame_count_
+      );
+    }
+
+    can_trace_enabled_ = false;
+  }
+
+  /**
+   * Optionally restrict tracing to a single PDO id. Pass -1 to disable filtering.
+   */
+  void set_can_trace_pdo_filter(float pdo) {
+    can_trace_pdo_filter_ = (int) pdo;
+    ESP_LOGI(TAG, "CAN trace PDO filter set to %d", can_trace_pdo_filter_);
+  }
+
+  void clear_can_trace_pdo_filter() {
+    can_trace_pdo_filter_ = -1;
+    ESP_LOGI(TAG, "CAN trace PDO filter cleared");
   }
 
   void setup() override{
@@ -150,7 +197,78 @@ class Comfoair: public Component, public climate::Climate, public esphome::api::
      register_service(&Comfoair::sendHex, "send_hex", {"hexSequence"});
      register_service(&Comfoair::req_update_service, "req_update_service", {"PDOID"});
      register_service(&Comfoair::update_next, "update_all", {});
+     register_service(&Comfoair::enable_can_trace, "enable_can_trace", {});
+     register_service(&Comfoair::disable_can_trace, "disable_can_trace", {});
+     register_service(&Comfoair::set_can_trace_pdo_filter, "set_can_trace_pdo_filter", {"pdo"});
+     register_service(&Comfoair::clear_can_trace_pdo_filter, "clear_can_trace_pdo_filter", {});
      this->update_next();
+  }
+
+  /**
+   * Logs a CAN frame (RX or TX) via ESP_LOGI when trace mode is enabled.
+   * Honors an optional PDO filter set via set_can_trace_pdo_filter().
+   */
+  void log_can_frame_(const char *direction, const CAN_FRAME &frame) {
+    if (!can_trace_enabled_)
+      return;
+
+    uint16_t pdo_id =
+        static_cast<uint16_t>((frame.id & 0x01FFF000) >> 14);
+
+    if (can_trace_pdo_filter_ >= 0 &&
+        pdo_id != can_trace_pdo_filter_) {
+      return;
+    }
+
+    can_trace_frame_count_++;
+
+    char data_buf[3 * 8 + 1];
+    size_t pos = 0;
+
+    for (uint8_t i = 0; i < frame.length && i < 8; i++) {
+      int written = snprintf(
+        data_buf + pos,
+        sizeof(data_buf) - pos,
+        "%02X%s",
+        frame.data.uint8[i],
+        i + 1 < frame.length ? " " : ""
+      );
+
+      if (written <= 0)
+        break;
+
+      pos += static_cast<size_t>(written);
+
+      if (pos >= sizeof(data_buf))
+        break;
+    }
+
+    data_buf[sizeof(data_buf) - 1] = '\0';
+
+    ESP_LOGI(
+      TAG,
+      "CAN %s id=0x%08" PRIX32
+      " pdo=%u ext=%u rtr=%u dlc=%u data=[%s]",
+      direction,
+      static_cast<uint32_t>(frame.id),
+      pdo_id,
+      frame.extended ? 1 : 0,
+      frame.rtr ? 1 : 0,
+      frame.length,
+      data_buf
+    );
+
+    ESP_LOGI(
+      TAG,
+      "CANCSV,%" PRIu32 ",%s,%08" PRIX32 ",%u,%u,%u,%s",
+      millis(),
+      direction,
+      static_cast<uint32_t>(frame.id),
+      pdo_id,
+      frame.rtr ? 1 : 0,
+      frame.length,
+      data_buf
+    );
   }
 
   void update_next() {
@@ -188,6 +306,8 @@ class Comfoair: public Component, public climate::Climate, public esphome::api::
   void loop(){
     // ESP_LOGD(TAG, "loop");
     if (CAN0.read(canMessage)) {
+        this->log_can_frame_("RX", canMessage);
+
         uint16_t PDOID = (canMessage.id & 0x01fff000) >> 14;
         uint8_t *vals = &canMessage.data.uint8[0];
         
@@ -355,6 +475,9 @@ class Comfoair: public Component, public climate::Climate, public esphome::api::
   int update_iterator_ = 0;
   bool boot_recheck_done_ = false;
   bool fan_speed_initialized_ = false;
+  bool can_trace_enabled_{false};
+  uint32_t can_trace_frame_count_{0};
+  int can_trace_pdo_filter_{-1};
   /* List of PDOs to request */
   std::vector<int> PDOs;
   /* map between pdoid and string key */
