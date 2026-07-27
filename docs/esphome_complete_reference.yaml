@@ -523,4 +523,21 @@ select:
 # 4. esphome.esp32_comfoair_can_bridge_update_all
 #    Keine Parameter
 #    Aktualisiert alle PDOs
+#
+# 5. esphome.esp32_comfoair_can_bridge_enable_can_trace
+#    Keine Parameter
+#    Aktiviert das CAN-Trace-Logging (RX/TX-Frames via ESP_LOGI).
+#    Deaktiviert sich automatisch nach 10 Minuten.
+#
+# 6. esphome.esp32_comfoair_can_bridge_disable_can_trace
+#    Keine Parameter
+#    Deaktiviert das CAN-Trace-Logging manuell.
+#
+# 7. esphome.esp32_comfoair_can_bridge_set_can_trace_pdo_filter
+#    Parameter: pdo (float/number)
+#    Schränkt das Trace-Logging auf eine einzelne PDO-ID ein.
+#
+# 8. esphome.esp32_comfoair_can_bridge_clear_can_trace_pdo_filter
+#    Keine Parameter
+#    Entfernt den PDO-Filter (loggt wieder alle Frames).
 # ============================================================================
