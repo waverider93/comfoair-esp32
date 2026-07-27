@@ -189,6 +189,14 @@ class Comfoair: public Component, public climate::Climate, public esphome::api::
     ESP_LOGI(TAG, "CAN trace PDO filter cleared");
   }
 
+  /**
+   * Returns whether CAN trace mode is currently active. Useful to back a
+   * template switch entity in ESPHome (turn_on/turn_off + lambda for state).
+   */
+  bool is_can_trace_enabled() const {
+    return can_trace_enabled_;
+  }
+
   void setup() override{
      CAN0.setCANPins( (gpio_num_t) this->rx_, (gpio_num_t) this->tx_);
      CAN0.begin(50000);

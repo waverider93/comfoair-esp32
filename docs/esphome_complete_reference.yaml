@@ -358,6 +358,24 @@ button:
       - lambda: id(comfo).send_command("boost_end");
 
 # ============================================================================
+# SWITCHES - CAN-Trace-Modus per Schalter ein-/ausschalten
+# ============================================================================
+switch:
+  - platform: template
+    name: "CAN Trace"
+    icon: "mdi:bug-check-outline"
+    # optimistic: false, da der Zustand direkt aus der Komponente gelesen wird
+    lambda: |-
+      return id(comfo).is_can_trace_enabled();
+    turn_on_action:
+      - lambda: id(comfo).enable_can_trace();
+    turn_off_action:
+      - lambda: id(comfo).disable_can_trace();
+    # Hinweis: Die Komponente deaktiviert das Tracing automatisch nach 10 Minuten.
+    # Der Schalter zeigt dank lambda-Statusabfrage dann automatisch wieder "aus" an,
+    # sobald ESPHome den Zustand das nächste Mal abfragt (Standard: alle paar Sekunden).
+
+# ============================================================================
 # SELECT-MENÜS - Alle verfügbaren Befehle
 # ============================================================================
 select:
