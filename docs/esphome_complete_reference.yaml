@@ -14,6 +14,26 @@ esp32:
   board: esp32dev
   framework:
     type: arduino
+    # -------------------------------------------------------------------------
+    # BEKANNTES BUILD-PROBLEM: "can_common.h: No such file or directory"
+    # -------------------------------------------------------------------------
+    # Neuere ESPHome-/PlatformIO-Versionen bauen das Arduino-Framework als
+    # ESP-IDF-Komponenten. Dabei wird für jede über cg.add_library() eingebundene
+    # Arduino-Bibliothek automatisch eine CMakeLists.txt erzeugt. Die gepinnte
+    # esp32_can-Fork deklariert in ihrer library.properties kein
+    # "depends=can_common", weshalb der Auto-Generator can_common nicht in die
+    # REQUIRES-Liste aufnimmt -> Build schlägt mit obigem Fehler fehl.
+    #
+    # Fix A (sauber): Fork von esp32_can erstellen, in library.properties die
+    #   Zeile "depends=can_common" ergänzen und in components/comfoair/__init__.py
+    #   die cg.add_library("esp32_can", ...)-URL auf den eigenen Fork/Commit
+    #   umbiegen.
+    #
+    # Fix B (schneller Workaround, nicht garantiert): eine ältere/andere
+    #   platform-espressif32-Version pinnen, die Arduino noch nicht als
+    #   ESP-IDF-Komponente baut, z. B.:
+    #
+    # platform_version: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.13/platform-espressif32.zip
 
 logger:
   level: DEBUG
