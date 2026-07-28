@@ -185,10 +185,9 @@ CONFIG_SCHEMA = cv.All(
 
 
 async def to_code(config):
-    cg.add_library("can_common", None, "https://github.com/collin80/can_common.git#8585f9dc807ebbeedeb509d74159f40f538d2d65")
     # collin80/esp32_can@6d835ae + drop unused deprecated ADC includes (issue #97)
-    cg.add_library("esp32_can", None, "https://github.com/vekexasia/esp32_can.git#13b42b4f4b7ad14939165270080303675ad9fb1e")
-
+    # cg.add_library("esp32_can", None, "https://github.com/vekexasia/esp32_can.git#13b42b4f4b7ad14939165270080303675ad9fb1e")
+    cg.add_library("esp32_can", None, "https://github.com/waverider93/ESP32_CAN.git#9867695cab86ca4b83a33794aea1202df1642be2")
 
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)

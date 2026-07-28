@@ -14,6 +14,26 @@ esp32:
   board: esp32dev
   framework:
     type: arduino
+    # -------------------------------------------------------------------------
+    # BEKANNTES BUILD-PROBLEM: "can_common.h: No such file or directory"
+    # -------------------------------------------------------------------------
+    # Neuere ESPHome-/PlatformIO-Versionen bauen das Arduino-Framework als
+    # ESP-IDF-Komponenten. Dabei wird für jede über cg.add_library() eingebundene
+    # Arduino-Bibliothek automatisch eine CMakeLists.txt erzeugt. Die gepinnte
+    # esp32_can-Fork deklariert in ihrer library.properties kein
+    # "depends=can_common", weshalb der Auto-Generator can_common nicht in die
+    # REQUIRES-Liste aufnimmt -> Build schlägt mit obigem Fehler fehl.
+    #
+    # Fix A (sauber): Fork von esp32_can erstellen, in library.properties die
+    #   Zeile "depends=can_common" ergänzen und in components/comfoair/__init__.py
+    #   die cg.add_library("esp32_can", ...)-URL auf den eigenen Fork/Commit
+    #   umbiegen.
+    #
+    # Fix B (schneller Workaround, nicht garantiert): eine ältere/andere
+    #   platform-espressif32-Version pinnen, die Arduino noch nicht als
+    #   ESP-IDF-Komponente baut, z. B.:
+    #
+    # platform_version: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.13/platform-espressif32.zip
 
 logger:
   level: DEBUG
@@ -358,6 +378,24 @@ button:
       - lambda: id(comfo).send_command("boost_end");
 
 # ============================================================================
+# SWITCHES - CAN-Trace-Modus per Schalter ein-/ausschalten
+# ============================================================================
+switch:
+  - platform: template
+    name: "CAN Trace"
+    icon: "mdi:bug-check-outline"
+    # optimistic: false, da der Zustand direkt aus der Komponente gelesen wird
+    lambda: |-
+      return id(comfo).is_can_trace_enabled();
+    turn_on_action:
+      - lambda: id(comfo).enable_can_trace();
+    turn_off_action:
+      - lambda: id(comfo).disable_can_trace();
+    # Hinweis: Die Komponente deaktiviert das Tracing automatisch nach 10 Minuten.
+    # Der Schalter zeigt dank lambda-Statusabfrage dann automatisch wieder "aus" an,
+    # sobald ESPHome den Zustand das nächste Mal abfragt (Standard: alle paar Sekunden).
+
+# ============================================================================
 # SELECT-MENÜS - Alle verfügbaren Befehle
 # ============================================================================
 select:
@@ -523,4 +561,21 @@ select:
 # 4. esphome.esp32_comfoair_can_bridge_update_all
 #    Keine Parameter
 #    Aktualisiert alle PDOs
+#
+# 5. esphome.esp32_comfoair_can_bridge_enable_can_trace
+#    Keine Parameter
+#    Aktiviert das CAN-Trace-Logging (RX/TX-Frames via ESP_LOGI).
+#    Deaktiviert sich automatisch nach 10 Minuten.
+#
+# 6. esphome.esp32_comfoair_can_bridge_disable_can_trace
+#    Keine Parameter
+#    Deaktiviert das CAN-Trace-Logging manuell.
+#
+# 7. esphome.esp32_comfoair_can_bridge_set_can_trace_pdo_filter
+#    Parameter: pdo (float/number)
+#    Schränkt das Trace-Logging auf eine einzelne PDO-ID ein.
+#
+# 8. esphome.esp32_comfoair_can_bridge_clear_can_trace_pdo_filter
+#    Keine Parameter
+#    Entfernt den PDO-Filter (loggt wieder alle Frames).
 # ============================================================================
