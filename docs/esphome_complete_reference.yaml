@@ -42,7 +42,7 @@ external_components:
   - source:
       type: git
       url: https://github.com/waverider93/comfoair-esp32
-      ref: fix/memory-leak-and-optimizations
+      ref: master  # Für neue Features vor dem Merge (z. B. feature/fireplace-mode) hier den Branch-Namen eintragen
     components: [comfoair]
     refresh: 1d
 
