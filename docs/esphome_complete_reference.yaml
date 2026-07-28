@@ -334,6 +334,32 @@ comfoair:
       name: "Nur Abluft aktiv"
       # Wert: true/false
 
+    # Feuerstättenmodus (Kaminschalter):
+    # - fireplace_mode_active meldet PDO 325 (0x00514041): ist der Modus
+    #   auf dem Hauptbus aktiv?
+    # - fireplace_input_contact meldet PDO 346 (0x00568041): physischer
+    #   Kontakt/Druckwächter an der OptionBox geschlossen?
+    fireplace_mode_active:
+      name: "Feuerstättenmodus aktiv"
+      # Wert: true/false
+    fireplace_input_contact:
+      name: "Feuerstättenmodus Kontakt (OptionBox)"
+      # Wert: true/false
+
+    # -------------------------------------------------------------------------
+    # SCHALTER: Feuerstättenmodus per Software setzen
+    # -------------------------------------------------------------------------
+    # Steuerung läuft über PDO 49 (0x000C4041) bzw. den Konfigurationsbus
+    # PDO 1028 (0x1F011054). Die exakte Byte-Sequenz ist herstellerseitig
+    # nicht dokumentiert und muss einmalig per CAN-Trace ermittelt werden
+    # (Bedienteil/App den Modus schalten lassen, CAN-Frames mitschneiden).
+    # Ohne on_command/off_command wird nur eine Warnung geloggt, es wird
+    # nichts auf den Bus geschrieben.
+    fireplace_mode:
+      name: "Feuerstättenmodus"
+      on_command: ""   # TODO: Hex-Bytes aus CAN-Trace eintragen, z. B. "8415..."
+      off_command: ""  # TODO: Hex-Bytes aus CAN-Trace eintragen
+
 # ============================================================================
 # ZEIT-SYNCHRONISATION
 # ============================================================================

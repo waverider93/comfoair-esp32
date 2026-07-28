@@ -7,6 +7,7 @@
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
+#include "esphome/components/switch/switch.h"
 #include "esphome/components/climate/climate.h"
 #include "esphome/components/climate/climate_mode.h"
 #include "esphome/components/climate/climate_traits.h"
@@ -494,6 +495,41 @@ class Comfoair: public Component, public climate::Climate, public esphome::api::
   std::map<int, ComfoSensor<text_sensor::TextSensor,  std::string (*)(uint8_t *)>> textSensors;
   std::map<int, ComfoSensor<binary_sensor::BinarySensor, bool (*)(uint8_t *)>> binarySensors;
 
+};
+
+/**
+ * Software-Schalter fuer den Feuerstaettenmodus (Steuerung ueber PDO 49 /
+ * PDO 1028 - CAN-ID 0x000C4041 bzw. 0x1F011054).
+ *
+ * Die exakte Byte-Sequenz zum Setzen/Ruecksetzen ist herstellerseitig nicht
+ * dokumentiert und variiert je nach Firmware-Stand der ComfoAir Q. Sie muss
+ * pro Anlage einmalig per CAN-Trace ermittelt (Bedienteil/App den Modus
+ * schalten lassen und die CAN-Frames mit einem Sniffer mitschneiden) und
+ * als Hex-String in der ESPHome-YAML hinterlegt werden (on_command /
+ * off_command). Ist keine Sequenz hinterlegt, wird das Schreiben bewusst
+ * uebersprungen, um keine falschen Daten auf den Bus zu senden.
+ */
+class ComfoairSwitch : public switch_::Switch, public Component {
+ public:
+  void set_parent(Comfoair *parent) { parent_ = parent; }
+  void set_on_command(std::string hex) { on_hex_ = hex; }
+  void set_off_command(std::string hex) { off_hex_ = hex; }
+
+  void write_state(bool state) override {
+    const std::string &hex = state ? on_hex_ : off_hex_;
+    if (hex.empty()) {
+      ESP_LOGW(TAG, "fireplace_mode: %s ist nicht konfiguriert - Kommando wird ignoriert (Sequenz per CAN-Trace ermitteln)",
+               state ? "on_command" : "off_command");
+      return;
+    }
+    parent_->sendHex(hex);
+    this->publish_state(state);
+  }
+
+ protected:
+  Comfoair *parent_{nullptr};
+  std::string on_hex_;
+  std::string off_hex_;
 };
 
 } //namespace comfoair

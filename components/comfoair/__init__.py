@@ -6,13 +6,16 @@ from esphome import pins
 from esphome.core import ID
 from esphome.util import Registry
 from esphome.const import CONF_ID, CONF_VERSION, CONF_NAME, UNIT_PERCENT, CONF_RX_PIN, CONF_TX_PIN
-from esphome.components import text_sensor, binary_sensor, sensor, climate
+from esphome.components import text_sensor, binary_sensor, sensor, switch, climate
 from enum import Enum
 
 DEPENDENCIES = ['climate']
 CONF_GLOBAL_FILTERS = "global_filters"
+CONF_ON_COMMAND = "on_command"
+CONF_OFF_COMMAND = "off_command"
+CONF_FIREPLACE_MODE = "fireplace_mode"
 
-AUTO_LOAD = ["text_sensor", "binary_sensor", "sensor", "climate"]
+AUTO_LOAD = ["text_sensor", "binary_sensor", "sensor", "switch", "climate"]
 MULTI_CONF = True
 
 CONF_HUB_ID = 'comfoair'
@@ -21,6 +24,7 @@ empty_sensor_hub_ns = cg.esphome_ns.namespace('comfoair')
 
 Comfoair = empty_sensor_hub_ns.class_('Comfoair', cg.Component)
 ComfoairClimate = empty_sensor_hub_ns.class_('ComfoairClimate', cg.Component)
+ComfoairSwitch = empty_sensor_hub_ns.class_('ComfoairSwitch', switch.Switch, cg.Component)
 class ComfoNumConvs(Enum):
     UINT8 = 0,
     UINT16 = 1,
@@ -150,6 +154,22 @@ return vals[0] != 0;
 return vals[0] != 0;
         '''
     },
+
+    # Feuerstaettenmodus: Status ueber den Hauptbus / OptionBox.
+    # PDO 325 (0x00514041) - meldet, ob der Feuerstaettenmodus aktiv ist.
+    "fireplace_mode_active": {
+        "PDO": 325,
+        "code": '''
+return (vals[0] & 0x01) != 0;
+        '''
+    },
+    # PDO 346 (0x00568041) - physischer Kontakt/Druckwaechter an der OptionBox.
+    "fireplace_input_contact": {
+        "PDO": 346,
+        "code": '''
+return (vals[0] & 0x01) != 0;
+        '''
+    },
 }
 GEN_SENSORS_SCHEMA = {
     cv.Optional(key, default=key): cv.maybe_simple_value(
@@ -169,6 +189,17 @@ GEN_BINARYSENSORS_SCHEMA = {
     for key, value in binarySensors.items()
 }
 
+# Software-Schalter fuer den Feuerstaettenmodus. on_command/off_command sind
+# Hex-Byte-Sequenzen, die per CAN-Trace ermittelt werden muessen (siehe
+# ComfoairSwitch-Doku in comfoair.h). Ohne konfigurierte Sequenz wird nur
+# geloggt, es wird nichts auf den Bus geschrieben.
+GEN_SWITCHES_SCHEMA = {
+    cv.Optional(CONF_FIREPLACE_MODE): switch.switch_schema(ComfoairSwitch).extend({
+        cv.Optional(CONF_ON_COMMAND, default=""): cv.string,
+        cv.Optional(CONF_OFF_COMMAND, default=""): cv.string,
+    }).extend(cv.COMPONENT_SCHEMA),
+}
+
 CONFIG_SCHEMA = cv.All(
     climate.climate_schema(Comfoair).extend({
         cv.GenerateID(): cv.declare_id(Comfoair),
@@ -179,6 +210,7 @@ CONFIG_SCHEMA = cv.All(
     .extend(GEN_SENSORS_SCHEMA)
     .extend(GEN_TEXTSENSORS_SCHEMA)
     .extend(GEN_BINARYSENSORS_SCHEMA)
+    .extend(GEN_SWITCHES_SCHEMA)
     .extend(cv.COMPONENT_SCHEMA),
     )
 
@@ -227,6 +259,14 @@ async def to_code(config):
 }}
 ''')
         cg.add(var.register_binarySensor(sens, key, value['PDO'], lamda))
+
+    if CONF_FIREPLACE_MODE in config:
+        sw_conf = config[CONF_FIREPLACE_MODE]
+        sw = await switch.new_switch(sw_conf)
+        await cg.register_component(sw, sw_conf)
+        cg.add(sw.set_parent(var))
+        cg.add(sw.set_on_command(sw_conf[CONF_ON_COMMAND]))
+        cg.add(sw.set_off_command(sw_conf[CONF_OFF_COMMAND]))
 
     # Register climate entity with new ESPHome API (must be awaited!)
     await climate.register_climate(var, config)
